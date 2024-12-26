@@ -2,11 +2,13 @@
 
 import os
 from agent_config import MODEL_CONFIG
+from test_config import TestConfig
 
 class BenchmarkConfig:
     """Configuration for the benchmark system."""
     
     def __init__(self):
+        self.test_config = TestConfig()
         self.GROQ_API_KEY = os.getenv("GROQ_API_KEY")
         if not self.GROQ_API_KEY:
             raise ValueError("GROQ_API_KEY not set")

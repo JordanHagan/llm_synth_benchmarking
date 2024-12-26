@@ -1,19 +1,22 @@
-import logging
-import uuid
-import pandas as pd
+import re
 import json
+import logging
+import pandas as pd
 from test_generator import TestGenerator
+from test_config import TestConfig
 from agent_config import MODEL_CONFIG
 from utils import create_agent
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    # level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('debug.log'),
         logging.StreamHandler()  # This will still print to console
     ]
 )
+
 logger = logging.getLogger(__name__)
 
 class TestValidator:
@@ -30,7 +33,7 @@ class TestValidator:
     def _parse_validation_results(self, validation_results: str):
         """Parse validation results with improved error handling and JSON cleanup."""
         try:
-            # Extract just the JSON array
+            # Extract just the array content
             start_idx = validation_results.find('[')
             end_idx = validation_results.rfind(']') + 1
             
@@ -40,122 +43,149 @@ class TestValidator:
                 
             json_str = validation_results[start_idx:end_idx]
             
-            # Clean up common JSON formatting issues
-            import re
+            # Clean up the JSON string
+            # Remove any line breaks and normalize whitespace
+            json_str = ' '.join(json_str.split())
             
-            # Remove any whitespace between lines
-            json_str = re.sub(r'\s+', ' ', json_str)
+            # Fix common JSON formatting issues
+            json_str = json_str.replace('}, ]', '}]')
+            json_str = json_str.replace('},]', '}]')
+            json_str = json_str.replace(',,', ',')
             
             # Remove any trailing commas before closing brackets
             json_str = re.sub(r',(\s*[\]}])', r'\1', json_str)
             
-            # Ensure arrays are properly terminated
-            json_str = re.sub(r'}\s*]$', '}]', json_str)
-            
-            logger.debug(f"Cleaned JSON string starts with: {json_str[:100]}")
-            
+            # Try to parse the cleaned JSON
             try:
-                # Parse the JSON
                 parsed_results = json.loads(json_str)
-                logger.info("Successfully parsed validation results JSON")
             except json.JSONDecodeError as e:
-                logger.error(f"JSON decode error: {str(e)}")
-                logger.error(f"Position {e.pos}, line {e.lineno}, col {e.colno}")
-                # Print the problematic section
-                start = max(0, e.pos - 50)
-                end = min(len(json_str), e.pos + 50)
-                logger.error(f"Context: ...{json_str[start:end]}...")
+                # Log the problematic section
+                error_pos = e.pos
+                context_start = max(0, error_pos - 50)
+                context_end = min(len(json_str), error_pos + 50)
+                logger.error(f"JSON parse error near position {error_pos}:")
+                logger.error(f"Context: ...{json_str[context_start:context_end]}...")
                 raise
                 
-            # Convert array format to dictionaries
+            # Convert to expected format
             formatted_results = []
-            for result_array in parsed_results:
-                result_dict = {}
-                for key_value_pair in result_array:
-                    if len(key_value_pair) == 2:
-                        key, value = key_value_pair
-                        result_dict[key] = value
-                formatted_results.append(result_dict)
-                
+            for result in parsed_results:
+                if isinstance(result, list):
+                    # Handle array format
+                    result_dict = {}
+                    for item in result:
+                        if isinstance(item, list) and len(item) >= 2:
+                            key, value = item[0], item[1]
+                            result_dict[key] = value
+                    formatted_results.append(result_dict)
+                else:
+                    # Already in dictionary format
+                    formatted_results.append(result)
+                    
             return formatted_results
+                        
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error: {str(e)}")
+            logger.error(f"Problematic JSON string: {validation_results}")
+            # Handle the error gracefully, e.g., return an empty list or default values
+            return []
+        
+        except Exception as e:
+            logger.error(f"Unexpected error during validation results parsing: {str(e)}")
+            logger.error(f"Validation results: {validation_results}")
+            raise ValueError("Failed to parse validation results") from e
+                
+    def _debug_json_structure(self, json_str: str):
+        """Debug helper to analyze JSON structure."""
+        try:
+            open_square = json_str.count('[')
+            close_square = json_str.count(']')
+            open_curly = json_str.count('{')
+            close_curly = json_str.count('}')
+            
+            if open_square != close_square or open_curly != close_curly:
+                logger.error(f"Unbalanced brackets/braces: [{open_square}:{close_square}] {{:{open_curly}:{close_curly}}}")
                 
         except Exception as e:
-            logger.error(f"Failed to parse validation results: {e}")
-            logger.error(f"Full raw validation results: {validation_results}")
-            raise ValueError("Failed to parse validation results") from e
+            logger.error(f"Error in debug analysis: {e}")
 
     async def validate_tests(self, df):
+        """Validate test cases and regenerate low-scoring cases."""
+        if not self.test_config.enable_validation:
+            logger.info("Validation disabled, returning original dataset")
+            return True, [], df
+            
         test_cases = df.to_dict('records')
+        if not self.test_config.enable_json_tests:
+            test_cases = [case for case in test_cases if case['test_case'] != 'json']
+            
         logger.info(f"Validating {len(test_cases)} test cases")
+        validation_results = await self.validator.ainvoke({'test_cases': test_cases})
+        self._debug_json_structure(validation_results)
         
-        validation_results = await self.validator.ainvoke({
-            'test_cases': test_cases
-        })
-        
-        # Log raw response for debugging
-        logger.info("Received validation results")
-        logger.debug(f"Raw validation results: {validation_results}")
-        
-        # Parse the validation results using our new method
         try:
             parsed_results = self._parse_validation_results(validation_results)
-            logger.info("Successfully parsed validation results")
         except ValueError as e:
             logger.error(f"Validation results parsing failed: {e}")
             raise
-            
-        # Process validation results
+        
         validated_rows = []
-        invalid_rows = []
+        regeneration_needed = {'json': 0, 'conversation': 0}
         validation_issues = []
         
         for result in parsed_results:
             try:
-                # Convert array format to dict if necessary
-                if isinstance(result, list):
-                    result_dict = {}
-                    for item in result:
-                        if len(item) == 2:  # Expecting ["key", "value"] format
-                            key, value = item
-                            result_dict[key] = value
-                    result = result_dict
-                
                 test_id = result.get('id')
                 prompt_score = result.get('prompt_quality_score', 0)
                 response_score = result.get('response_quality_score', 0)
                 
-                if prompt_score > 3 and response_score > 3:
-                    try:
-                        row = df[df['id'] == test_id].iloc[0]
-                        validated_rows.append(row)
-                        logger.debug(f"Test case passed validation - ID: {test_id}")
-                    except IndexError:
-                        logger.error(f"Could not find original test case with ID: {test_id}")
+                row = df[df['id'] == test_id].iloc[0]
+                test_type = row['test_case']
+                
+                if prompt_score >= 4 and response_score >= 4:
+                    print(validated_rows)
+                    validated_rows.append(row)
+                    logger.debug(f"Test case passed validation - ID: {test_id}")
                 else:
-                    invalid_rows.append(test_id)
+                    regeneration_needed[test_type] = regeneration_needed.get(test_type, 0) + 1
+                    print(validation_issues)
                     validation_issues.append({
                         'id': test_id,
+                        'test_type': test_type,
                         'prompt_score': prompt_score,
                         'response_score': response_score,
-                        'reason': 'Scores below threshold'
                     })
-                    logger.info(f"Test case failed validation - ID: {test_id}, "
-                            f"Prompt Score: {prompt_score}, Response Score: {response_score}")
             except Exception as e:
-                logger.error(f"Error processing validation result: {e}")
-                logger.error(f"Problematic result: {result}")
+                logger.error(f"Error processing result {test_id}: {e}")
                 continue
+        
+        # Regenerate cases that didn't meet quality threshold
+        if validation_issues:
+            logger.info(f"Regenerating {sum(regeneration_needed.values())} low-scoring test cases")
+            additional_cases = await self._generate_additional_cases(
+                json_count=regeneration_needed.get('json', 0),
+                conv_count=regeneration_needed.get('conversation', 0)
+            )
+            if not additional_cases.empty:
+                validated_rows.extend(additional_cases.to_dict('records'))
         
         validated_df = pd.DataFrame(validated_rows)
         validation_passed = len(validation_issues) == 0
         
-        logger.info(f"Validation complete: {len(validated_rows)} passed, {len(validation_issues)} failed")
+        logger.info(f"Validation complete: {len(validated_rows)} passed, {len(validation_issues)} regenerated")
+        
+        print(validated_df.head())
         
         return validation_passed, validation_issues, validated_df
 
     async def _generate_additional_cases(self, json_count, conv_count):
+        """Generate additional test cases to replace low-scoring ones."""
+        if json_count == 0 and conv_count == 0:
+            return pd.DataFrame()
+            
         test_generator = TestGenerator(self.config, self.test_config)
         additional_cases = await test_generator.generate_test_cases(json_count, conv_count)
-        return additional_cases
-    
-    
+        
+        # Validate new cases immediately
+        _, _, validated_cases = await self.validate_tests(additional_cases)
+        return validated_cases

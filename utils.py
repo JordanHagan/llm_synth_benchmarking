@@ -9,7 +9,7 @@ from langchain_core.runnables.base import RunnableSerializable
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('debug.log'),
@@ -51,6 +51,11 @@ def create_agent(
             ("system", system_prompt),
             ("human", "{test_cases}")
         ])
+    elif agent_type == 'report_generator':
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "Metrics Data:\n{metrics_data}\n\nFeature Flags:\n{feature_flags}")
+        ])
     else:  # model_A and model_B
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
@@ -62,53 +67,49 @@ def create_agent(
     return prompt | llm | StrOutputParser()
 
 def parse_json_response(response: Any) -> list:
-    """Parse JSON response with improved error handling.
+    """Parse JSON response with improved error handling for array format."""
     
-    Args:
-        response: Response to parse. Can be:
-            - A list of test cases
-            - A single test case object
-            - A string containing JSON (either array or object)
-            - A string with multiple JSON objects
-        
-    Returns:
-        List of test cases
-    """
-    if isinstance(response, list):
-        return response
-        
-    if isinstance(response, dict):
-        return [response]
+    def is_valid_array_structure(data):
+        """Check if data follows our expected array structure."""
+        if not isinstance(data, list):
+            return False
+        for case in data:
+            if not isinstance(case, list):
+                return False
+            # Each case should be a list of key-value pair arrays
+            for pair in case:
+                if not isinstance(pair, list) or len(pair) != 2:
+                    return False
+        return True
 
+    if isinstance(response, list):
+        if is_valid_array_structure(response):
+            return response
+        logger.warning(f"Response is a list but doesn't match expected structure: {response[:100]}...")
+            
     if isinstance(response, str):
         try:
             # First try to parse as is
             parsed = json.loads(response)
-            if isinstance(parsed, list):
+            if is_valid_array_structure(parsed):
                 return parsed
-            if isinstance(parsed, dict):
-                return [parsed]
-
-            # If that fails, try to find JSON objects in the string
-            test_cases = []
-            # Look for patterns like {...} or [{...}]
+                
+            # Try to find array patterns in the string
             import re
-            json_objects = re.findall(r'\{[^{}]*\}', response)
+            array_pattern = r'\[\s*\[\s*\[.*?\]\s*\]\s*\]'
+            matches = re.findall(array_pattern, response, re.DOTALL)
             
-            for json_str in json_objects:
+            for match in matches:
                 try:
-                    test_case = json.loads(json_str)
-                    if all(key in test_case for key in ['id', 'prompt', 'golden_response', 'test_case']):
-                        test_cases.append(test_case)
+                    parsed_match = json.loads(match)
+                    if is_valid_array_structure(parsed_match):
+                        return parsed_match
                 except json.JSONDecodeError:
                     continue
-            
-            if test_cases:
-                return test_cases
-                
+                    
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON response: {e}")
-            logger.debug(f"Problematic response: {response}")
+            logger.debug(f"Problematic response: {response[:500]}...")
             
-    logger.warning(f"Unexpected response type: {type(response)}")
+    logger.warning(f"Unexpected response type or structure: {type(response)}")
     return []

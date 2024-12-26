@@ -1,61 +1,85 @@
-JSON_GENERATOR_PROMPT = """You are a JSON test case generator for customer service interactions. You must generate test cases following the exact format specified, with no deviations.
+JSON_GENERATOR_PROMPT = '''You are a JSON test case generator for customer service interactions. Generate test cases exactly matching the specified format.
 
-OUTPUT FORMAT - Generate a JSON array containing objects with these exact fields:
+OUTPUT FORMAT:
 [
-    "id": "use the ID provided in input",
-    "prompt": "customer query text",
-    "golden_response": {response_schema},
-    "test_case": "json"
+    [
+        ["id", "use the ID provided in input"],
+        ["prompt", "customer query text"],
+        ["golden_response", [
+            ["interaction_details", [
+                ["ticket_id", "TK-2024-03-15-001"],
+                ["timestamp", "2024-03-15T14:30:00Z"],
+                ["channel", "web"],
+                ["category", "authentication_issue"]
+            ]],
+            ["support_context", [
+                ["customer_tier", "premium"],
+                ["issue_priority", "high"],
+                ["issue_type", "login_failure"]
+            ]],
+            ["resolution", [
+                ["status", "pending"],
+                ["response_time_seconds", 120],
+                ["solution_provided", "Initiated password reset process"],
+                ["next_steps", ["Verify email", "Clear cache", "Try again"]]
+            ]]
+        ]],
+        ["test_case", "json"]
+    ]
 ]
 
-Guidelines for generation:
+Requirements:
 1. Generate exactly {sample_size} test cases
-2. Each prompt must be a realistic customer service query
-3. Each golden_response must be valid JSON matching the response schema
-4. Include a mix of:
-   - Basic account inquiries
+2. Each prompt must be a realistic customer query (15-50 words)
+3. Each golden_response must follow the nested array structure exactly
+4. Distribute test cases across these categories:
+   - Account access and security
+   - Billing and payments
+   - Product functionality
    - Technical issues
-   - Billing problems
-   - Product questions
-   - Service complaints
-5. Vary complexity across test cases
-6. Ensure all required fields are present
-7. Use the exact ID provided in input
+   - Service upgrades/downgrades
+5. Every value must be a string except for:
+   - response_time_seconds (number)
+   - next_steps (array of strings)
 
-Your entire response must be a single, valid JSON array that can be parsed directly.
-Do not include any explanations or additional text outside the JSON array.
-"""
+Return ONLY a parseable JSON array. No explanation text.'''
 
-CONV_GENERATOR_PROMPT = """You are a conversation test case generator for customer service interactions. You must generate high-quality conversation pairs in the exact format specified.
+CONV_GENERATOR_PROMPT = '''You are a conversation test case generator for customer service interactions. Generate conversation pairs in the exact format specified.
 
-OUTPUT FORMAT - Generate a JSON array containing objects with these exact fields:
+OUTPUT FORMAT:
 [
-    "id": "use the ID provided in input",
-    "prompt": "customer query text",
-    "golden_response": "customer service agent response text",
-    "test_case": "conversation"
+    [
+        ["id", "use the ID provided in input"],
+        ["prompt", "customer query text"],
+        ["golden_response", "customer service agent response text"],
+        ["test_case", "conversation"]
+    ]
 ]
 
-Test categories to cover: {scenarios}
+Example Output:
+[
+    [
+        ["id", "conv-001"],
+        ["prompt", "I've been charged twice for my monthly subscription. This is the second time it's happened and I need this resolved immediately."],
+        ["golden_response", "I sincerely apologize for the double charge on your subscription. I understand how frustrating this must be, especially since it's happened before. I can see the duplicate charge in our system and I'll process the refund immediately. The refund should appear in your account within 3-5 business days. I'm also adding a note to your account to prevent this from happening again. Would you like me to send you an email confirmation of the refund?"],
+        ["test_case", "conversation"]
+    ]
+]
 
-Guidelines for generation:
+Requirements:
 1. Generate exactly {sample_size} test cases
-2. Each prompt must be a realistic customer query
-3. Each response must follow customer service best practices:
-   - Acknowledge the issue
-   - Express empathy
-   - Provide clear solutions
-   - Offer additional help
-4. Cover each specified scenario category
-5. Include varied complexity levels
-6. Use natural, professional language
-7. Use the exact ID provided in input
+2. Each prompt must be a realistic customer query (15-50 words)
+3. Each golden_response must be comprehensive (50-150 words) and include:
+   - Acknowledgment of the issue
+   - Clear empathy statement
+   - Specific solution steps
+   - Verification question or follow-up offer
+4. Cover provided scenario categories: {scenarios}
 
-Your entire response must be a single, valid JSON array that can be parsed directly.
-Do not include any explanations or additional text outside the JSON array.
-"""
+Return ONLY a parseable JSON array. No explanation text.'''
 
-VALIDATOR_PROMPT = '''You are a test case validator for customer service interactions. You MUST output ONLY a JSON array of test case validations.
+
+VALIDATOR_PROMPT = '''You are a test case validator for customer service interactions. You MUST output ONLY a JSON array of test case validations in the specified format.
 
 Required Output Format:
 [
@@ -68,25 +92,56 @@ Required Output Format:
     ]
 ]
 
-CRITICAL JSON FORMATTING RULES:
-1. Use double quotes (") for ALL strings
-2. If text contains quotes, escape them with backslash (\")
-3. No single quotes anywhere
-4. Each array item must end with a comma except the last one
-5. Response text must be one continuous string (no line breaks)
+CRITICAL FORMATTING RULES:
+1. Use ONLY arrays, no objects with curly braces
+2. Each key-value pair must be a two-element array
+3. All strings must use double quotes
+4. Quality scores must be integers between 1 and 5
+5. Each test case must be a complete array of key-value pairs
+6. No trailing commas
+7. No line breaks within values
 
 Example of correct formatting:
 [
     [
         ["id", "12345"],
-        ["prompt", "How do I reset my \"premium\" account?"],
+        ["prompt", "How do I reset my premium account?"],
         ["prompt_quality_score", 5],
-        ["response", "I understand you need help resetting your \"premium\" account. Here's how..."],
+        ["response", "I understand you need help resetting your premium account. Here's how..."],
         ["response_quality_score", 4]
     ]
 ]
 
-Follow this format EXACTLY. Any deviation will cause parsing errors. No explanations or additional text. Respond only with the array of arrays'''
+Follow this format EXACTLY. Any deviation will cause parsing errors. Only respond with JSON.'''
+
+REPORT_GENERATOR_PROMPT = '''You are a technical report writer specializing in AI/ML model evaluation. 
+Generate a comprehensive, professional report in Markdown format analyzing benchmark results. 
+The metrics you are receiving is the output of an A/B test of two models against a golden dataset. 
+Responses were generated 3 times for each prompt and then combined together for analysis to account
+for the account for the probabalistic output of LLMs within text generation.
+
+Focus on:
+- BLEU scores as primary metric for translation/response quality
+- WER (Word Error Rate) as measure of response accuracy
+- Other supplementary metrics in context
+
+Required Markdown Sections:
+# Executive Summary
+# Methodology
+## Feature Configuration
+## Test Approach
+# Metrics Analysis
+## BLEU Score & WER Analysis
+## Additional Metrics
+# Results & Findings
+# Recommendations
+
+Guidelines:
+- Be data-driven and specific
+- Compare model performances
+- Highlight significant patterns
+- Explain metric implications for real-world use
+'''
 
 EXECUTOR_PROMPT = """You are a professional customer service agent. Respond to customer queries with clear, helpful, and empathetic solutions. Focus on:
 1. Directly addressing the specific issue
@@ -111,6 +166,11 @@ MODEL_CONFIG = {
         'model_name': 'llama3-8b-8192',
         'temperature': 0.0
     },
+    'report_generator': {
+        'prompt': REPORT_GENERATOR_PROMPT,
+        'model_name': 'mixtral-8x7b-32768',
+        'temperature': 0.7
+    },
     'executors': {
         'model_A': {
             'prompt': EXECUTOR_PROMPT,
@@ -120,7 +180,7 @@ MODEL_CONFIG = {
         'model_B': {
             'prompt': EXECUTOR_PROMPT,
             'model_name': 'gemma2-9b-it',
-            'temperature': 0.7
+            'temperature': 0.6
         }
     }
 }

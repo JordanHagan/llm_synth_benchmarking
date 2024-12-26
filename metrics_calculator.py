@@ -1,4 +1,3 @@
-import os
 import json
 import pandas as pd
 import numpy as np
@@ -20,19 +19,36 @@ class MetricsCalculator:
         self.stop_words = set(stopwords.words('english'))
 
     def _load_metrics(self):
-        self.json_metrics = self.test_config.metrics['json_tests']
-        self.conv_metrics = self.test_config.metrics['conversation_metrics']
+        if self.test_config.enable_json_tests: 
+            self.json_metrics = self.test_config.metrics['json_tests']
+            self.conv_metrics = self.test_config.metrics['conversation_metrics']
+        else:
+            self.conv_metrics = self.test_config.metrics['conversation_metrics']
 
     def calculate_all_metrics(self, results: dict, conversation_tests: pd.DataFrame, json_tests: pd.DataFrame) -> dict:
         metrics = {}
+        print("DEBUG: Starting metrics calculation")
+        print(f"DEBUG: Conversation tests available: {len(conversation_tests)}")
+        
         for model, model_results in results.items():
-            conv_responses = model_results[model_results['test_case'] == 'conversation']
-            json_responses = model_results[model_results['test_case'] == 'json']
+            print(f"DEBUG: Processing model: {model}")
+            print(f"DEBUG: Model results shape: {model_results.shape}")
+            print(f"DEBUG: Test types found: {model_results['test_case'].unique()}")
             
-            metrics[model] = {
-                'json_metrics': self._calculate_json_metrics(json_responses, json_tests),
-                'conversation_metrics': self._calculate_conversation_metrics(conv_responses, conversation_tests)
-            }
+            model_metrics = {}
+
+            # Updated to handle 'customer, agent' test case
+            conv_responses = model_results[model_results['test_case'] == 'customer, agent']
+            print(f"DEBUG: Conversation responses found: {len(conv_responses)}")
+            
+            if not conv_responses.empty:  
+                print("DEBUG: Calculating conversation metrics...")
+                model_metrics['conversation_metrics'] = self._calculate_conversation_metrics(conv_responses, conversation_tests)
+                
+            print(model_metrics)
+
+            metrics[model] = model_metrics
+        
         return metrics
 
     def _calculate_json_metrics(self, responses: pd.DataFrame, golden_tests: pd.DataFrame) -> dict:
@@ -62,6 +78,7 @@ class MetricsCalculator:
         }
 
     def _calculate_conversation_metrics(self, responses: pd.DataFrame, golden_tests: pd.DataFrame) -> dict:
+        print("❤️ working on some metrics....")
         total_tests = len(responses)
         if total_tests == 0:
             return {metric: 0 for metric in self.conv_metrics}
@@ -100,45 +117,59 @@ class MetricsCalculator:
             return False
 
     def _check_field_accuracy(self, response, golden):
+        """Check field accuracy for array-formatted responses."""
         total_fields = 0
         matched_fields = 0
         
-        def compare_fields(resp_obj, gold_obj):
+        def compare_arrays(resp_arr, gold_arr):
             nonlocal total_fields, matched_fields
-            for key in gold_obj:
-                if isinstance(gold_obj[key], dict):
-                    if key in resp_obj and isinstance(resp_obj[key], dict):
-                        compare_fields(resp_obj[key], gold_obj[key])
-                else:
+            if not isinstance(resp_arr, list) or not isinstance(gold_arr, list):
+                return
+                
+            # Handle flat key-value arrays
+            if len(resp_arr) == 2 and isinstance(resp_arr[0], str):
+                key = resp_arr[0]
+                value = resp_arr[1]
+                if len(gold_arr) == 2 and gold_arr[0] == key:
                     total_fields += 1
-                    if key in resp_obj and resp_obj[key] == gold_obj[key]:
+                    if gold_arr[1] == value:
                         matched_fields += 1
+                return
+                
+            # Handle nested arrays
+            for resp_item, gold_item in zip(resp_arr, gold_arr):
+                if isinstance(resp_item, list):
+                    compare_arrays(resp_item, gold_item)
         
-        compare_fields(response, golden)
+        compare_arrays(response, golden)
         return matched_fields / total_fields if total_fields > 0 else 0
 
     def _check_structure(self, response, schema):
-        required_keys = set()
+        """Check structure compliance for array-formatted responses."""
+        required_fields = set()
         
-        def collect_required_keys(schema_obj):
-            if isinstance(schema_obj, dict):
-                if 'required' in schema_obj:
-                    required_keys.update(schema_obj['required'])
-                for value in schema_obj.values():
-                    collect_required_keys(value)
-                    
-        collect_required_keys(schema)
+        def collect_required_fields(schema_arr):
+            if isinstance(schema_arr, list):
+                if len(schema_arr) == 2 and isinstance(schema_arr[0], str):
+                    required_fields.add(schema_arr[0])
+                else:
+                    for item in schema_arr:
+                        collect_required_fields(item)
+                        
+        def check_response_fields(resp_arr):
+            found_fields = set()
+            if isinstance(resp_arr, list):
+                if len(resp_arr) == 2 and isinstance(resp_arr[0], str):
+                    found_fields.add(resp_arr[0])
+                else:
+                    for item in resp_arr:
+                        found_fields.update(check_response_fields(item))
+            return found_fields
         
-        found_keys = set()
-        def check_keys(obj):
-            if isinstance(obj, dict):
-                found_keys.update(obj.keys())
-                for value in obj.values():
-                    check_keys(value)
-                    
-        check_keys(response)
+        collect_required_fields(schema)
+        found_fields = check_response_fields(response)
         
-        return len(required_keys.intersection(found_keys)) / len(required_keys) if required_keys else 0
+        return len(required_fields.intersection(found_fields)) / len(required_fields) if required_fields else 0
 
     def _score_relevance(self, response, prompt):
         # Tokenize and remove stop words

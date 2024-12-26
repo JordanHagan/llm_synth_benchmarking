@@ -10,6 +10,16 @@ from datetime import datetime
 from utils import create_agent
 from agent_config import MODEL_CONFIG
 
+logging.basicConfig(
+    # level=logging.DEBUG,
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('debug.log'),
+        logging.StreamHandler()  # This will still print to console
+    ]
+)
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -59,90 +69,74 @@ class TestExecutor:
                 raise RuntimeError(f"Model initialization failed: {str(e)}")
 
     def _extract_customer_query(self, row) -> str:
-        """Extract the actual customer query from a test case.
-        
-        Args:
-            row: DataFrame row containing test case data
-            
-        Returns:
-            str: Extracted customer query
-        """
+        """Extract the actual customer query from a test case."""
         try:
             if row['test_case'] == 'json':
-                # Skip empty JSON responses
-                if not row['golden_response'] or row['golden_response'] == '{}':
-                    logger.warning(f"Empty JSON response for test case {row['id']}")
-                    return row['prompt'] if row['prompt'] else "Could not extract query"
-                    
-                # Parse the JSON response if it's a string
                 response_obj = row['golden_response']
                 if isinstance(response_obj, str):
                     try:
-                        print(response_obj)
                         response_obj = json.loads(response_obj)
                     except json.JSONDecodeError:
-                        logger.error(f"Failed to parse JSON for test case {row['id']}")
-                        return row['prompt']
+                        logger.warning(f"Failed to parse JSON for test case {row['id']}")
+                        return self._clean_query_text(row['prompt'])
                 
-                # Extract query based on our expected JSON structure
                 try:
-                    # Navigate the nested structure to find the query
                     interaction = response_obj.get('customer_interaction', {}).get('interaction', {})
                     query = interaction.get('summary', '')
-                    if query:
-                        return query
-                    else:
-                        logger.warning(f"No query found in JSON structure for test case {row['id']}")
-                        return row['prompt']
-                except (KeyError, AttributeError) as e:
-                    logger.error(f"Error parsing JSON structure: {e}")
-                    return row['prompt']
+                    return self._clean_query_text(query) if query else self._clean_query_text(row['prompt'])
+                except (KeyError, AttributeError):
+                    return self._clean_query_text(row['prompt'])
                     
             else:  # conversation test case
-                # Extract query from different conversation formats
-                query_text = row['prompt']
-                
-                # Look for text between single quotes (the actual customer query)
-                if "'" in query_text:
-                    parts = query_text.split("'")
-                    if len(parts) >= 3:  # Ensure we have opening and closing quotes
-                        return parts[1]
-                
-                # Fallback: try to find query after a colon
-                if ':' in query_text:
-                    return query_text.split(':', 1)[1].strip()
-                
-                return query_text
+                return self._clean_query_text(row['prompt'])
                 
         except Exception as e:
             logger.error(f"Error extracting query: {e}")
-            return row['prompt'] if row['prompt'] else "Could not extract query"
+            return "Could not extract query"
+
+    def _clean_query_text(self, text: str) -> str:
+        """Clean and normalize query text."""
+        if not text:
+            return "No query provided"
+            
+        text = str(text).strip()
+        text = text.replace('\n', ' ').replace('\r', ' ')
+        text = ' '.join(text.split())  # Normalize whitespace
         
+        # Remove any surrounding quotes
+        if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+            text = text[1:-1]
+            
+        return text
+            
     async def run_tests(self, test_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
         """Run all test cases against all models for specified number of rounds."""
-        results = {}
+        raw_results = {}
+        
+        # Run tests for each model
         for model_name, model in self.models.items():
             model_results = []
-            for round in range(1, self.config.TEST_ROUNDS + 1):
-                round_results = await self._run_single_round(model_name, model, test_df, round)
-                model_results.append(round_results)
-            results[model_name] = pd.concat(model_results, ignore_index=True)
-        
-        self._save_failed_attempts()
-        return results
-
-    async def execute_tests(self, test_df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
-            """Run all test cases against all models for specified number of rounds."""
-            results = {}
-            for model_name, model in self.models.items():
-                model_results = []
-                for round in range(1, self.config.TEST_ROUNDS + 1):
-                    round_results = await self._run_single_round(model_name, model, test_df, round)
-                    model_results.append(round_results)
-                results[model_name] = pd.concat(model_results, ignore_index=True)
             
-            self._save_failed_attempts()
-            return results
+            # Run multiple rounds
+            for round_num in range(1, self.config.TEST_ROUNDS + 1):
+                try:
+                    round_results = await self._run_single_round(model_name, model, test_df, round_num)
+                    model_results.append(round_results)
+                except Exception as e:
+                    logger.error(f"Failed to run round {round_num} for model {model_name}: {e}")
+                    continue
+            
+            # Combine all rounds for this model
+            if model_results:
+                raw_results[model_name] = pd.concat(model_results, ignore_index=True)
+            else:
+                logger.error(f"No valid results for model {model_name}")
+                raw_results[model_name] = pd.DataFrame()  # Empty DataFrame with correct structure
+        
+        # Store failed attempts
+        self._save_failed_attempts()
+        
+        return raw_results
 
     async def _run_single_round(self, model_name: str, model, test_df: pd.DataFrame, round_num: int) -> pd.DataFrame:
         """Run a single round of testing for one model against all test cases."""
@@ -152,7 +146,6 @@ class TestExecutor:
                 try:
                     await self._exponential_backoff(attempt)
                     
-                    # Extract the actual customer query
                     customer_query = self._extract_customer_query(row)
                     logger.debug(f"Extracted query: {customer_query} from test case {row['id']}")
                     
@@ -166,8 +159,12 @@ class TestExecutor:
                         timeout=self.config.TIMEOUT
                     )
                     
+                    # Clean the response string
+                    if isinstance(response, str):
+                        response = response.replace("\n", " ").replace("\r", " ").strip()
+                    
                     response_dict = self._create_response_dict(row, response, round_num)
-                    response_dict['actual_query'] = customer_query  # Add the actual query for reference
+                    response_dict['actual_query'] = customer_query
                     responses.append(response_dict)
                     break
                 except Exception as e:
@@ -176,6 +173,7 @@ class TestExecutor:
                         responses.append(self._create_error_response(row, str(e), round_num))
         
         return pd.DataFrame(responses)
+        
 
     async def _exponential_backoff(self, attempt: int):
         """Implement exponential backoff between retry attempts."""
@@ -185,14 +183,25 @@ class TestExecutor:
 
     def _create_response_dict(self, row, response, round_num):
         """Create a dictionary containing test response data."""
-        return {
-            'id': row['id'],
-            'prompt': row['prompt'],
-            'model_response': response,
-            'test_case': row['test_case'],
-            'round': round_num,
-            'timestamp': datetime.now().isoformat()
-        }
+        try:
+            return {
+                'id': str(row['id']),  # Ensure ID is string
+                'prompt': str(row['prompt']),
+                'model_response': str(response),  # Ensure response is string
+                'test_case': str(row['test_case']),
+                'round': int(round_num),
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Error creating response dictionary: {e}")
+            return {
+                'id': str(row['id']),
+                'prompt': str(row['prompt']),
+                'model_response': f"ERROR: Failed to format response - {str(e)}",
+                'test_case': str(row['test_case']),
+                'round': int(round_num),
+                'timestamp': datetime.now().isoformat()
+            }
 
     def _create_error_response(self, row, error, round_num):
         """Create a dictionary containing error response data."""
