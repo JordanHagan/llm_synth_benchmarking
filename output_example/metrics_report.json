@@ -1,0 +1,43 @@
+{
+  "run_timestamp": "20241226_161436",
+  "configuration": {
+    "models_tested": [
+      "model_A",
+      "model_B"
+    ],
+    "total_test_cases": 15,
+    "rounds_per_model": 3,
+    "json_tests_enabled": false,
+    "validation_enabled": true
+  },
+  "results_summary": {
+    "model_A": {
+      "avg_bleu_score": 0.04233111985400602,
+      "avg_task_completion": 0.6245508413155471
+    },
+    "model_B": {
+      "avg_bleu_score": 0.04608322419065878,
+      "avg_task_completion": 0.545469432528256
+    }
+  },
+  "detailed_metrics": {
+    "model_A": {
+      "conversation_metrics": {
+        "bleu_score": 0.04233111985400602,
+        "wer_score": 2.4810686373477067,
+        "response_relevance": 0.07266987573226137,
+        "clarity": 0.9185826651848323,
+        "task_completion": 0.6245508413155471
+      }
+    },
+    "model_B": {
+      "conversation_metrics": {
+        "bleu_score": 0.04608322419065878,
+        "wer_score": 1.3098463812649859,
+        "response_relevance": 0.10810066317144547,
+        "clarity": 0.9497575757575757,
+        "task_completion": 0.545469432528256
+      }
+    }
+  }
+}
