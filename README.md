@@ -15,11 +15,84 @@ This project works to implement an end-to-end pipeline for benchmarking AI langu
 
 ## Architecture
 
-### Components
+## Pipeline Workflow
+
+The following diagram illustrates the end-to-end workflow of our benchmarking pipeline:
+
+```mermaid
+graph TD
+    %% Generation Phase
+    Generator["Test Case Generator<br/>(mixtral-8x7b-32768)<br/>JSON & Conversation Cases"]
+    Initial["Initial Dataset<br/>(Golden Dataset)"]
+    Generator --> Initial
+
+    %% Validation Phase
+    Validator["Validator Agent<br/>(llama3-8b-8192)"]
+    Rejected["Rejected Cases"]
+    Validated["Validated Cases"]
+    Initial --> Validator
+    Validator -->|Quality Score < 4| Rejected
+    Validator -->|Quality Score >= 4| Validated
+    Rejected --> Generator
+
+    %% Execution Phase
+    ModelA["Model A Executor<br/>(llama3-70b-8192)"]
+    ModelB["Model B Executor<br/>(gemma2-9b-it)"]
+    Validated --> ModelA
+    Validated --> ModelB
+
+    %% Model A Results
+    A1["Model A Response Set 1"]
+    A2["Model A Response Set 2"]
+    A3["Model A Response Set 3"]
+    Aggregate1["3 Responses per Prompt"]
+    ModelA -->|Round 1| A1
+    ModelA -->|Round 2| A2
+    ModelA -->|Round 3| A3
+    A1 --> Aggregate1
+    A2 --> Aggregate1
+    A3 --> Aggregate1
+
+    %% Model B Results
+    B1["Model B Response Set 1"]
+    B2["Model B Response Set 2"]
+    B3["Model B Response Set 3"]
+    Aggregate2["3 Responses per Prompt"]
+    ModelB -->|Round 1| B1
+    ModelB -->|Round 2| B2
+    ModelB -->|Round 3| B3
+    B1 --> Aggregate2
+    B2 --> Aggregate2
+    B3 --> Aggregate2
+
+    %% Evaluation Phase
+    Calculator["Metrics Calculator"]
+    ReportGen["Report Generator Agent<br/>(mixtral-8x7b-32768)"]
+    Report["Final Analysis Report<br/>- A/B Test Analysis<br/>- Performance Metrics<br/>(Markdown Format)"]
+    
+    Aggregate1 --> Calculator
+    Aggregate2 --> Calculator
+    Initial -->|Golden Responses| Calculator
+    
+    Calculator --> ReportGen
+    ReportGen --> Report
+```
+
+The pipeline consists of several key phases:
+
+1. **Generation Phase**: A test case generator creates the initial golden dataset containing both JSON and conversation test cases using mixtral-8x7b-32768.
+
+2. **Validation Phase**: A validator agent (llama3-8b-8192) assesses each test case, filtering out low-quality cases (score < 4) and passing high-quality cases (score >= 4) to the execution phase.
+
+3. **Execution Phase**: Two model executors (Model A: llama3-70b-8192 and Model B: gemma2-9b-it) process the validated test cases. Each model runs three rounds of testing to ensure consistency.
+
+4. **Evaluation Phase**: A metrics calculator processes the results from both models along with the golden responses. The calculated metrics are then passed to a report generator (mixtral-8x7b-32768) which produces a final analysis report in Markdown format, including A/B test analysis and detailed performance metrics.
+
+### Components - Python Files
 1. **Test Generator** (`test_generator.py`)
    - Generates test cases for both structured JSON outputs and conversational responses
    - Uses LLMs to create diverse, realistic customer service scenarios
-   - Implements UUID-based test case tracking
+   - Implements id-based test case tracking
    - Feature flag to enable/disable JSON test generation
 
 2. **Test Validator** (`test_validator.py`) 
@@ -102,17 +175,36 @@ The pipeline generates several outputs:
 ## Metrics
 The pipeline calculates two sets of metrics:
 
-### JSON Test Metrics
+### JSON Test Metrics (more to come)
 - Schema compliance rate
 - Field accuracy  
 - Structural consistency
 
 ### Conversation Metrics
-- Response relevance
-- Clarity
-- Task completion
-- BLEU score
-- Word Error Rate (WER)
+
+The pipeline evaluates model responses using the following metrics:
+
+- **Response Relevance**: Measures how well the response addresses the input prompt using Jaccard similarity between tokenized prompt and response (excluding stop words). Higher scores indicate better topical alignment between the question and answer.
+
+- **Clarity**: Evaluates response readability based on sentence structure:
+  - Penalizes extremely long sentences (>50 words) and very short sentences (<3 words)
+  - Considers the presence of transition words (e.g., 'however', 'but', 'although')
+  - Scores range from 0-1, with higher scores indicating clearer responses
+
+- **Task Completion**: Assesses how thoroughly the response addresses the prompt:
+  - Calculates overlap between task-specific keywords from prompt and response
+  - Applies a bonus multiplier (1.2x) when resolution indicators are present (e.g., 'resolved', 'completed', 'solution')
+  - Higher scores suggest more comprehensive problem resolution
+
+- **BLEU Score**: (Bilingual Evaluation Understudy)
+  - Standard metric for comparing model output against reference text
+  - Measures n-gram overlap between model response and golden response
+  - Range: 0-1, where higher scores indicate better match with reference answer
+
+- **Word Error Rate (WER)**:
+  - Calculates minimum number of word-level operations (insertions, deletions, substitutions) needed to transform model response into reference response
+  - Lower scores indicate closer match to golden response
+  - Useful for identifying significant deviations from expected responses
 
 ## Implementation Details
 
@@ -131,24 +223,28 @@ The pipeline calculates two sets of metrics:
   - Metrics based on test configuration and A/B results
 
 ### Error Handling
-- Exponential backoff for API rate limiting
-- Configurable retry mechanism for failed requests
-- Comprehensive error logging and tracking
+- **Exponential Backoff**: Implements delay = min(300, 2^attempt + random(0,1)) seconds between retries
+- **Retry Mechanism**: Configurable MAX_RETRIES (default: 3) with detailed error tracking per attempt
+- **Error Logging**: Saves failed attempts to timestamped CSV files with attempt number, error message, and full context
 
 ### Data Validation 
-- Schema-based validation for JSON responses (if enabled)
-- Quality scoring for conversational responses (if enabled)
-- Minimum quality thresholds (default: 3)
+- **JSON Validation**: Uses jsonschema.Draft7Validator to verify structure and data types of model outputs
+- **Quality Scoring**: Evaluates responses on prompt relevance (0-5) and response completeness (0-5)
+- **Validation Pipeline**:
+  1. Checks structural compliance
+  2. Validates field types and constraints
+  3. Scores response quality
+  4. Routes failed cases back to generation
 
 ## Future Enhancements
-- Additional metric implementations
-- Custom test case generation strategies
-- Re-enable JSON Golden Set generation (currently set to FALSE)
-- Set up code for easy connection to already existing Golden Datasets for evaluation
+- **Metrics Expansion**: Add toxicity scoring, contextual relevance, and sentiment analysis
+- **Test Generation**: Implement few-shot learning and adversarial test case generation
+- **Golden Set Integration**: Add support for CSV/JSON/JSONL golden dataset imports
+- **Evaluation Tooling**: Build interactive dashboard for results analysis
 
 ## Technical Decisions  
-- Async execution for improved throughput
-- Modular architecture for easy component replacement
-- Comprehensive logging for debugging and analysis 
-- Configurable parameters for different use cases
-- Feature flags for flexible pipeline customization
+- **Async Implementation**: Uses asyncio for concurrent model calls and file operations
+- **Modular Design**: Each component (Generator, Validator, Executor, Calculator) is independently configurable
+- **Logging Strategy**: Structured logging with configurable verbosity and output formats
+- **Configuration Management**: External YAML config files for environment-specific settings
+- **Feature Toggles**: Controls for JSON testing, validation strictness, and metric selection
