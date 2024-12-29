@@ -110,12 +110,16 @@ class BenchmarkPipeline:
             raise
 
     def _calculate_and_save_metrics(self, test_results, test_df, results_dir):
-        # Update test case filtering
-        conversation_tests = test_df[test_df['test_case'] == 'customer, agent']
-        json_tests = test_df[test_df['test_case'] == 'json'] if self.test_config.enable_json_tests else pd.DataFrame()
-
+        """Run Conversation Metrics"""
+        conversation_tests = test_df[test_df['test_case'].isin(['customer, agent', 'conversation'])]
         print(f"DEBUG: Found {len(conversation_tests)} conversation tests")
-        print(f"DEBUG: Found {len(json_tests)} JSON tests")
+        
+        # Initialize json_tests as an empty DataFrame by default
+        json_tests = pd.DataFrame()
+        
+        if self.test_config.enable_json_tests:
+            json_tests = test_df[test_df['test_case'] == 'json']
+            print(f"DEBUG: Found {len(json_tests)} JSON tests")
 
         metrics = self.calculator.calculate_all_metrics(test_results, conversation_tests, json_tests)
 

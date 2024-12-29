@@ -1,5 +1,5 @@
 {
-  "run_timestamp": "20241226_161436",
+  "run_timestamp": "20241229_161453",
   "configuration": {
     "models_tested": [
       "model_A",
@@ -12,31 +12,31 @@
   },
   "results_summary": {
     "model_A": {
-      "avg_bleu_score": 0.04233111985400602,
-      "avg_task_completion": 0.6245508413155471
+      "avg_bleu_score": 0.059584621439319536,
+      "avg_task_completion": 0.9150000000000001
     },
     "model_B": {
-      "avg_bleu_score": 0.04608322419065878,
-      "avg_task_completion": 0.545469432528256
+      "avg_bleu_score": 0.054281112305020335,
+      "avg_task_completion": 0.7170512820512821
     }
   },
   "detailed_metrics": {
     "model_A": {
       "conversation_metrics": {
-        "bleu_score": 0.04233111985400602,
-        "wer_score": 2.4810686373477067,
-        "response_relevance": 0.07266987573226137,
-        "clarity": 0.9185826651848323,
-        "task_completion": 0.6245508413155471
+        "bleu_score": 0.059584621439319536,
+        "wer_score": 2.4478991190679174,
+        "response_relevance": 0.0967847949235931,
+        "clarity": 0.9318657383726437,
+        "task_completion": 0.9150000000000001
       }
     },
     "model_B": {
       "conversation_metrics": {
-        "bleu_score": 0.04608322419065878,
-        "wer_score": 1.3098463812649859,
-        "response_relevance": 0.10810066317144547,
-        "clarity": 0.9497575757575757,
-        "task_completion": 0.545469432528256
+        "bleu_score": 0.054281112305020335,
+        "wer_score": 1.275127877237852,
+        "response_relevance": 0.11277215815829471,
+        "clarity": 0.9530865800865801,
+        "task_completion": 0.7170512820512821
       }
     }
   }

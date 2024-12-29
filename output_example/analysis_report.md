@@ -1,50 +1,35 @@
 # Executive Summary
 
-This technical report presents the evaluation results of two AI/ML models, Model A and Model B, based on an A/B test against a golden dataset. The test was conducted with a total of 15 test cases, with each model generating responses three times for each prompt. The primary focus of this evaluation is on BLEU scores, Word Error Rate (WER), and other supplementary metrics.
+This technical report presents the evaluation results of two AI/ML models, Model A and Model B, based on an A/B test conducted against a golden dataset. The assessment focuses on the quality of translation/response and accuracy of generated responses, utilizing BLEU scores, Word Error Rate (WER), and other supplementary metrics.
 
-Model B outperformed Model A in BLEU score, with an average BLEU score of 0.04608 compared to Model A's 0.04233. However, Model A had a higher average task completion rate of 0.625 compared to Model B's 0.545. Model B also showed a lower WER of 1.310 compared to Model A's 2.481.
+Model A outperformed Model B in terms of BLEU score and task completion, demonstrating better overall translation/response quality and accuracy. However, Model B showed slightly better performance in response relevance and clarity.
 
 # Methodology
 
 ## Feature Configuration
 
-The following features were tested:
-
-- Model A
-- Model B
-
-A total of 15 test cases were conducted, with each model generating responses three times for each prompt.
+The A/B test involved two models, Model A and Model B, with 15 test cases per model, each model running through three rounds to account for the probabilistic output of large language models. JSON tests were not enabled, and validation was enabled throughout the test.
 
 ## Test Approach
 
-The test approach involved an A/B test of the two models against a golden dataset. Responses were generated 3 times for each prompt and then combined together for analysis to account for the probabilistic output of LLMs within text generation. The primary metrics used for evaluation are BLEU scores, WER, response relevance, clarity, and task completion.
+The test approach consisted of running both models against the same dataset, comparing the generated responses using predefined evaluation metrics. Each model was tested three times for each test case to ensure a robust and reliable comparison.
 
 # Metrics Analysis
 
 ## BLEU Score & WER Analysis
 
-Model B outperformed Model A in BLEU score, with an average BLEU score of 0.04608 compared to Model A's 0.04233. This indicates that Model B produced translations/responses that were closer to the reference translations/responses in the golden dataset.
-
-Model B also showed a lower WER of 1.310 compared to Model A's 2.481. This indicates that Model B had fewer word errors in its translations/responses compared to Model A.
+Model A achieved an average BLEU score of 0.05958, compared to Model B's score of 0.05428. Model A's average WER score was 2.448, versus Model B's score of 1.275. In relative terms, Model A exhibited a 10.2% higher BLEU score and a 91.0% higher WER score compared to Model B. These findings indicate that Model A produces responses of higher quality but with lower accuracy than Model B.
 
 ## Additional Metrics
 
-Model A had a higher average task completion rate of 0.625 compared to Model B's 0.545. This indicates that Model A was able to complete more tasks successfully compared to Model B.
-
-Model B, however, had a higher response relevance score of 0.108 compared to Model A's 0.073. This indicates that Model B's responses were more relevant to the prompts given.
-
-Model B also had a higher clarity score of 0.950 compared to Model A's 0.919. This indicates that Model B's responses were clearer and easier to understand compared to Model A's.
+Model A demonstrated higher response relevance (9.68% vs. 11.28%) and lower clarity (93.19% vs. 95.31%) compared to Model B. Model A also outperformed Model B in average task completion (91.5% vs. 71.7%). These results suggest that Model A generates more relevant but less clear responses, while Model B provides less relevant but clearer outputs.
 
 # Results & Findings
 
-Model B outperformed Model A in BLEU score, WER, response relevance, and clarity. However, Model A had a higher task completion rate compared to Model B.
-
-The higher BLEU score and lower WER of Model B indicate that it produced more accurate translations/responses compared to Model A. The higher response relevance and clarity scores of Model B indicate that its responses were more relevant and clearer compared to Model A.
-
-However, Model A's higher task completion rate indicates that it was able to complete more tasks successfully compared to Model B. This may be due to Model A being more conservative in its responses, leading to a higher success rate in completing tasks.
+Model A outperformed Model B in terms of BLEU score and task completion, indicating better overall translation/response quality and accuracy. However, Model B showed better performance in response relevance and clarity, suggesting that Model B might be more suitable for specific applications requiring clearer outputs.
 
 # Recommendations
 
-Based on the results of this evaluation, Model B is recommended for use in cases where accuracy in translation/response and response relevance are critical. However, if task completion is a key requirement, Model A may be a better choice due to its higher task completion rate.
+Considering the overall performance, it is recommended to use Model A as the primary model due to its superior BLEU score and task completion performance. However, for applications requiring clearer outputs, Model B may be a more suitable alternative. It is crucial to weigh the trade-offs between response quality and clarity when selecting the most appropriate model for specific use cases.
 
-It is recommended that both models continue to be evaluated and improved over time, as advancements in AI/ML technology may result in improved performance. Additionally, it is recommended that other metrics, such as human evaluation, be used in conjunction with automated metrics to provide a more comprehensive evaluation of the models.
+Further investigation and tuning of both models may lead to improved performance, particularly in the areas where Model B currently outperforms Model A. Exploring techniques to balance response quality and clarity is an essential area for future research.

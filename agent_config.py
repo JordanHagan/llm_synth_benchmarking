@@ -79,46 +79,53 @@ Requirements:
 Return ONLY a parseable JSON array. No explanation text.'''
 
 
-VALIDATOR_PROMPT = '''You are a test case validator for customer service interactions. You MUST output ONLY a JSON array of test case validations in the specified format.
-
+VALIDATOR_PROMPT = '''You are a test case validator for customer service interactions. You MUST output ONLY a JSON array of test case validations in the specified format, with no additional commentary or explanation.
 Required Output Format:
 [
-    [
-        ["id", "exact ID from input test case"],
-        ["prompt", "exact prompt from test case"],
-        ["prompt_quality_score", <integer 1-5>],
-        ["response", "exact response from test case"],
-        ["response_quality_score", <integer 1-5>]
-    ]
-]
-
-CRITICAL FORMATTING RULES:
-1. Use ONLY arrays, no objects with curly braces
-2. Each key-value pair must be a two-element array
-3. All strings must use double quotes
-4. Quality scores must be integers between 1 and 5
-5. Each test case must be a complete array of key-value pairs
-6. No trailing commas
-7. No line breaks within values
-
-Example of correct formatting:
 [
-    [
-        ["id", "12345"],
-        ["prompt", "How do I reset my premium account?"],
-        ["prompt_quality_score", 5],
-        ["response", "I understand you need help resetting your premium account. Here's how..."],
-        ["response_quality_score", 4]
-    ]
+["id", "<exact ID from input test case>"],
+["prompt", "<exact prompt from test case>"],
+["prompt_quality_score", <integer 1-5>],
+["response", "<exact response from test case>"],
+["response_quality_score", <integer 1-5>]
 ]
+]
+Formatting Rules:
 
-Follow this format EXACTLY. Any deviation will cause parsing errors. Only respond with JSON.'''
+The outer structure must be a JSON array, containing only test case subarrays.
+Each test case subarray must contain exactly 5 key-value pair subarrays.
+The keys must be lowercase strings "id", "prompt", "prompt_quality_score", "response", and "response_quality_score".
+The values for "id", "prompt", and "response" must be strings enclosed in double quotes.
+The values for "prompt_quality_score" and "response_quality_score" must be integers from 1 to 5 inclusive.
+Strings cannot contain line breaks. Condense them to a single line if needed.
+Do not include any trailing commas.
+
+Example of valid output format:
+[
+[
+["id", "conv-001"],
+["prompt", "How do I activate my new credit card?"],
+["prompt_quality_score", 5],
+["response", "To activate your new credit card, please call the number on the sticker on the front of the card. You'll be asked to provide the card number and some identifying information. The process takes just a few minutes. Let me know if you have any other questions!"],
+["response_quality_score", 4]
+],
+[
+["id", "conv-002"],
+["prompt", "Tell me about your product return policy"],
+["prompt_quality_score", 5],
+["response", "Our return policy allows you to return most unopened items in new condition within 30 days of delivery for a full refund. Some exclusions apply. Return shipping costs will be deducted from your refund unless the return is due to our error. You can find the full policy on our website or I'd be happy to email you a copy. How else can I assist you today?"],
+["response_quality_score", 5]
+]
+]
+The JSON output must conform to this format exactly, with no deviations. Do not include any other text, explanation, or apology in your response - ONLY the JSON array.'''
 
 REPORT_GENERATOR_PROMPT = '''You are a technical report writer specializing in AI/ML model evaluation. 
 Generate a comprehensive, professional report in Markdown format analyzing benchmark results. 
 The metrics you are receiving is the output of an A/B test of two models against a golden dataset. 
 Responses were generated 3 times for each prompt and then combined together for analysis to account
-for the account for the probabalistic output of LLMs within text generation.
+for the account for the probabalistic output of LLMs within text generation. You understand deeply common NLP statistics.
+That a lower WER is good and a higher BLEU is good - be sure to put scores in to relative terms. If both bad
+scores and close together, it doesn't really matter what the better score is (for example).
 
 Focus on:
 - BLEU scores as primary metric for translation/response quality
@@ -154,12 +161,12 @@ MODEL_CONFIG = {
     'json_generator': {
         'prompt': JSON_GENERATOR_PROMPT,
         'model_name': 'mixtral-8x7b-32768',
-        'temperature': 0.7
+        'temperature': 0.0
     },
     'conversation_generator': {  
         'prompt': CONV_GENERATOR_PROMPT,
         'model_name': 'mixtral-8x7b-32768', 
-        'temperature': 0.7
+        'temperature': 0.2
     },
     'validator': {
         'prompt': VALIDATOR_PROMPT,
@@ -175,12 +182,12 @@ MODEL_CONFIG = {
         'model_A': {
             'prompt': EXECUTOR_PROMPT,
             'model_name': 'llama3-70b-8192',
-            'temperature': 0.7  
+            'temperature': 0.1  
         },
         'model_B': {
             'prompt': EXECUTOR_PROMPT,
             'model_name': 'gemma2-9b-it',
-            'temperature': 0.6
+            'temperature': 0.5
         }
     }
 }
