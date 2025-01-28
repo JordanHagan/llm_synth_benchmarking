@@ -1,20 +1,20 @@
 {
   "model_A": {
     "conversation_metrics": {
-      "bleu_score": 0.059584621439319536,
-      "wer_score": 2.4478991190679174,
-      "response_relevance": 0.0967847949235931,
-      "clarity": 0.9318657383726437,
-      "task_completion": 0.9150000000000001
+      "bleu_score": 0.05759759342218564,
+      "wer_score": 3.4977584674632167,
+      "response_relevance": 0.09616260654841566,
+      "clarity": 0.885251646903821,
+      "task_completion": 0.8566349206349206
     }
   },
   "model_B": {
     "conversation_metrics": {
-      "bleu_score": 0.054281112305020335,
-      "wer_score": 1.275127877237852,
-      "response_relevance": 0.11277215815829471,
-      "clarity": 0.9530865800865801,
-      "task_completion": 0.7170512820512821
+      "bleu_score": 0.06308497627223157,
+      "wer_score": 3.4318751851486127,
+      "response_relevance": 0.10801133481661224,
+      "clarity": 0.8661781144781145,
+      "task_completion": 0.8322962962962964
     }
   }
 }
