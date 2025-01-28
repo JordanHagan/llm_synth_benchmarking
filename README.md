@@ -36,7 +36,8 @@ export GROQ_API_KEY="your_api_key_here"
 
 ## 🏗️ Architecture
 
-```graph TD
+```mermaid
+graph TD
     %% Test Case Generation
     Generator["Test Case Generator<br/>(llama-3.3-70b-versatile)"]
     Generator -->|JSON Cases| InitialJSON[("Initial JSON Dataset")]
