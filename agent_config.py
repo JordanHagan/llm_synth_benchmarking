@@ -376,13 +376,13 @@ Remember: Focus on delivering clear, actionable insights that drive decision-mak
 MODEL_CONFIG = {
     'json_generator': {
         'prompt': JSON_GENERATOR_PROMPT,
-        'model_name': 'llama-3.1-8b-instant',
+        'model_name': 'llama-3.3-70b-versatile',
         'temperature': 0.0,
         'tools': [JSON_GENERATOR_TOOL]
     },
     'conversation_generator': {   
         'prompt': CONV_GENERATOR_PROMPT, 
-        'model_name': 'llama-3.1-8b-instant',
+        'model_name': 'llama-3.3-70b-versatile',
         'temperature': 0.1,
         'tools': [CONVERSATION_GENERATOR_TOOL]  
     },
@@ -394,19 +394,19 @@ MODEL_CONFIG = {
     },
     'report_generator': {
         'prompt': REPORT_GENERATOR_PROMPT,  
-        'model_name': 'llama-3.3-70b-versatile',
+        'model_name': 'llama-3.1-8b-instant',
         'temperature': 0.3 
     },
     'executors': {
         'model_A': { 
             'prompt': EXECUTOR_PROMPT,
             'model_name': 'mixtral-8x7b-32768',
-            'temperature': 0.2, 
+            'temperature': 0.1, 
             'tools': [EXECUTOR_TOOL]
         },  
         'model_B': {
             'prompt': EXECUTOR_PROMPT, 
-            'model_name': 'mixtral-8x7b-32768',
+            'model_name': 'gemma2-9b-it',
             'temperature': 0.2,
             'tools': [EXECUTOR_TOOL]
         }

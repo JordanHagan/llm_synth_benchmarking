@@ -26,5 +26,5 @@ class BenchmarkConfig:
         self.TIMEOUT = 30.0
         
         # Rate limiting parameters
-        self.RETRY_DELAY = 5  # Base delay in seconds
+        self.RETRY_DELAY = 2  # Base delay in seconds
         self.MAX_WAIT_TIME = 60  # Maximum wait time in seconds (5 minutes)
