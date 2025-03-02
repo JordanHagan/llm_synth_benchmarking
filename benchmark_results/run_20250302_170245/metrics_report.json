@@ -1,0 +1,55 @@
+{
+  "run_timestamp": "20250302_170446",
+  "configuration": {
+    "models_tested": [
+      "model_A",
+      "model_B"
+    ],
+    "total_test_cases": 18,
+    "rounds_per_model": 3,
+    "json_tests_enabled": true,
+    "validation_enabled": true
+  },
+  "results_summary": {
+    "model_A": {
+      "avg_bleu_score": 0.1672274497335083,
+      "avg_task_completion": 0.8023809523809523,
+      "avg_json_compliance": 0.0
+    },
+    "model_B": {
+      "avg_bleu_score": 0.1020705407045097,
+      "avg_task_completion": 0.8101190476190476,
+      "avg_json_compliance": 1.0
+    }
+  },
+  "detailed_metrics": {
+    "model_A": {
+      "conversation_metrics": {
+        "bleu_score": 0.1672274497335083,
+        "wer_score": 1.3195072900955254,
+        "response_relevance": 0.18377985318774795,
+        "clarity": 0.9551282051282052,
+        "task_completion": 0.8023809523809523
+      },
+      "json_metrics": {
+        "schema_compliance_rate": 0.0,
+        "field_accuracy": 0.0,
+        "structural_consistency": 0.0
+      }
+    },
+    "model_B": {
+      "conversation_metrics": {
+        "bleu_score": 0.1020705407045097,
+        "wer_score": 1.0613373554550025,
+        "response_relevance": 0.1830148149541644,
+        "clarity": 1.0,
+        "task_completion": 0.8101190476190476
+      },
+      "json_metrics": {
+        "schema_compliance_rate": 1.0,
+        "field_accuracy": 1.0,
+        "structural_consistency": 1.0
+      }
+    }
+  }
+}

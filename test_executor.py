@@ -41,11 +41,39 @@ class TestExecutor:
     def _initialize_models(self):
         """Initialize model configurations from the provided config."""
         for name, model_path in self.config.TEST_MODELS.items():
-            model_config = MODEL_CONFIG['executors'][name]
+            # Initialize dictionaries for different test case types
+            conversation_config = None
+            json_config = None
+            
+            
+            # Try to get conversation executor configuration
+            try:
+                conv_config = MODEL_CONFIG['conversation_executors'][name]
+                conversation_config = {
+                    'model': conv_config['model_name'],
+                    'prompt': conv_config['prompt'],
+                    'temperature': conv_config['temperature'],
+                    'tools': conv_config.get('tools', [])
+                }
+            except KeyError:
+                logger.warning(f"No conversation executor configuration found for {name}")
+                
+            # Try to get JSON executor configuration
+            try:
+                json_config = MODEL_CONFIG['json_executors'][name]
+                json_config = {
+                    'model': json_config['model_name'],
+                    'prompt': json_config['prompt'],
+                    'temperature': json_config['temperature'],
+                    'tools': json_config.get('tools', [])
+                }
+            except KeyError:
+                logger.warning(f"No JSON executor configuration found for {name}")
+                
+            # Store both configurations
             self.models[name] = {
-                'model': model_config['model_name'],
-                'prompt': model_config['prompt'],
-                'temperature': model_config['temperature']
+                'conversation': conversation_config,
+                'json': json_config
             }
     
     def _extract_customer_query(self, row: Dict) -> str:
@@ -99,7 +127,7 @@ class TestExecutor:
         text = ' '.join(text.split())
         
         if (text.startswith('"') and text.endswith('"')) or \
-           (text.startswith("'") and text.endswith("'")):
+        (text.startswith("'") and text.endswith("'")):
             text = text[1:-1]
         
         return text
@@ -154,8 +182,9 @@ class TestExecutor:
         
         for _, row in test_df.iterrows():
             try:
+                test_case_type = row['test_case']
                 customer_query = self._extract_customer_query(row)
-                response = await self._execute_model_query(model, customer_query)
+                response = await self._execute_model_query(model, customer_query, test_case_type)
                 
                 response_dict = self._create_response_dict(
                     row,
@@ -173,35 +202,47 @@ class TestExecutor:
         return pd.DataFrame(responses)
     
     @groq_rate_limit(max_retries=3, base_delay=1.0)
-    async def _execute_model_query(self, model: Dict, query: str):
+    async def _execute_model_query(self, model, query, test_case_type=None):
         """Execute a query using Groq's tool use capabilities."""
         try:
+            # Select appropriate model configuration based on test case type
+            if test_case_type == 'json' and model['json']:
+                model_config = model['json']
+            elif test_case_type == 'conversation' and model['conversation']:
+                model_config = model['conversation']
+            else:
+                # Fallback to any available configuration
+                model_config = model['json'] if model['json'] else model['conversation']
+                
+            if not model_config:
+                raise ValueError(f"No configuration available for test case type: {test_case_type}")
+                
             from groq import Groq
             client = Groq()
             
             response = client.chat.completions.create(
-                model=model['model'],
+                model=model_config['model'],
                 messages=[
                     {
                         "role": "system",
-                        "content": model['prompt']
+                        "content": model_config['prompt']
                     },
                     {
                         "role": "user",
                         "content": query
                     }
                 ],
-                tools=model.get('tools', []),
+                tools=model_config.get('tools', []),
                 tool_choice="auto",
-                temperature=model['temperature']
+                temperature=model_config['temperature']
             )
 
-            return response.content if hasattr(response, 'content') else response
+            return response
             
         except Exception as e:
             logger.error(f"Model query execution failed: {e}")
             raise
-        
+            
     def _create_response_dict(
         self,
         row: Dict,

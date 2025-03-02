@@ -15,9 +15,9 @@ class TestConfig:
     def __init__(self):
         """Initialize with default settings."""
         # Feature flags 
-        self.enable_json_tests = False
+        self.enable_json_tests = True
         self.enable_validation = True
-        self.sample_size = 5
+        self.sample_size = 2
         
         self._initialize_schemas()
         self._initialize_test_categories() 

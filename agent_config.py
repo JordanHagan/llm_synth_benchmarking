@@ -136,13 +136,7 @@ Tool Call:
                     "initiate chargeback",
                     "secure account"
                 ]
-            },
-            "metrics": {
-                "response_time": 120,
-                "satisfaction_score": 0,
-                "resolution_time": 3600
             }
-        }
     },
     "test_case": "json"
 }
@@ -266,7 +260,7 @@ Validation Requirements:
 
 The tool enforces strict schema validation. Your output must conform precisely to these specifications.'''
 
-EXECUTOR_PROMPT = '''You are a customer service agent with access to the process_customer_response tool for handling customer inquiries. Your role is to provide clear, professional, and solution-oriented responses.
+CONV_EXECUTOR_PROMPT = '''You are a customer service agent with access to the process_customer_response tool for handling customer inquiries. Your role is to provide clear, professional, and solution-oriented responses.
 
 Core Responsibilities:
 When handling customer inquiries, you must:
@@ -315,6 +309,56 @@ Format Requirements:
 
 The tool enforces schema validation for all responses. Your output must conform exactly to these specifications.'''
 
+JSON_EXECUTOR_PROMPT = '''You are a customer service agent specializing in structured responses. You receive detailed customer service scenarios in JSON format and must provide professional, solution-oriented responses using the process_customer_response tool.
+
+Core Responsibilities:
+When handling JSON-formatted scenarios, you must:
+1. Extract and analyze the customer's issue from the provided scenario details
+2. Use the process_customer_response tool to structure your response
+3. Ensure your response addresses the specific details in the scenario
+4. Provide category-appropriate solutions
+
+Tool Usage Protocol:
+For each customer interaction:
+1. Analyze the scenario details from the JSON
+2. Determine appropriate response type based on the scenario category
+3. Structure response using the tool
+4. Include detailed next steps tailored to the scenario
+
+Example Tool Interaction:
+Input: Scenario with customer reporting billing dispute
+Tool Call Response:
+{
+    "response_text": "I understand there's been an unauthorized charge on your account. I take billing issues seriously and will help resolve this immediately. First, I'll need to verify some account details to protect your security.",
+    "response_type": "clarification",
+    "next_steps": [
+        "verify account ownership",
+        "confirm transaction details",
+        "investigate charge origin",
+        "process dispute form",
+        "apply temporary credit while investigating"
+    ]
+}
+
+Response Requirements:
+1. Reference specific details from the scenario in your response
+2. Match your tone to the priority level indicated in the scenario
+3. Provide resolution steps specific to the interaction category
+4. Follow company protocols for the specific type of issue
+
+Response Types:
+- answer: Direct response for simple information requests
+- clarification: When more information is needed before resolution
+- solution: Complete resolution with specific steps
+
+Format Requirements:
+1. Use proper punctuation and grammar
+2. Structure complex solutions into clear, numbered steps
+3. Include specific next actions with timelines when applicable
+4. Maintain consistent formatting
+
+The tool enforces schema validation for all responses. Your output must conform exactly to these specifications.'''
+
 REPORT_GENERATOR_PROMPT = '''You are a technical report generator specializing in machine learning model evaluation. Your role is to create comprehensive, data-driven reports analyzing model performance in customer service scenarios.
 
 Report Structure Requirements:
@@ -350,17 +394,6 @@ Format Requirements:
 4. Highlight key metrics
 5. Proper citation of data sources
 
-Example Section:
-# Model Evaluation Report
-
-## Performance Summary
-Model A demonstrated superior performance in complex queries, achieving 88% accuracy (p < 0.01) compared to Model B's 85%. Response quality metrics show significant improvement with few-shot examples.
-
-## Key Metrics
-- Response Time: Model A averaged 2.3s vs Model B's 3.1s
-- Task Completion: 92% vs 87% success rate
-- Customer Satisfaction: 4.2/5 vs 3.9/5 average rating
-
 Quality Standards:
 1. All metrics must include:
    - Precise decimal values
@@ -394,21 +427,35 @@ MODEL_CONFIG = {
     },
     'report_generator': {
         'prompt': REPORT_GENERATOR_PROMPT,  
-        'model_name': 'llama-3.1-8b-instant',
+        'model_name': 'llama-3.3-70b-versatile',
         'temperature': 0.3 
     },
-    'executors': {
+    'conversation_executors': {
         'model_A': { 
-            'prompt': EXECUTOR_PROMPT,
-            'model_name': 'mixtral-8x7b-32768',
-            'temperature': 0.1, 
+            'prompt': CONV_EXECUTOR_PROMPT,
+            'model_name': 'deepseek-r1-distill-llama-70b',
+            'temperature': 0.2, 
+            'tools': []
+        },  
+        'model_B': {
+            'prompt': CONV_EXECUTOR_PROMPT, 
+            'model_name': 'deepseek-r1-distill-qwen-32b',
+            'temperature': 0.2,
+            'tools': []
+        }
+    },
+    'json_executors': {
+        'model_A': { 
+            'prompt': JSON_EXECUTOR_PROMPT,
+            'model_name': 'deepseek-r1-distill-llama-70b',
+            'temperature': 0.0, 
             'tools': [EXECUTOR_TOOL]
         },  
         'model_B': {
-            'prompt': EXECUTOR_PROMPT, 
-            'model_name': 'gemma2-9b-it',
-            'temperature': 0.2,
+            'prompt': JSON_EXECUTOR_PROMPT, 
+            'model_name': 'deepseek-r1-distill-qwen-32b',
+            'temperature': 0.0,
             'tools': [EXECUTOR_TOOL]
         }
-    } 
+    }
 }

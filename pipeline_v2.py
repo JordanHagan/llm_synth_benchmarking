@@ -211,12 +211,7 @@ class BenchmarkPipeline:
             logger.error(f"Error calculating metrics: {str(e)}")
             raise
             
-    def _generate_metrics_report(
-        self, 
-        metrics: Dict,
-        test_results: Dict[str, pd.DataFrame],
-        results_dir: str
-    ) -> None:
+    def _generate_metrics_report(self, metrics, test_results, results_dir):
         """Generate and save the metrics report."""
         logger.info("Generating metrics report")
         
@@ -239,11 +234,17 @@ class BenchmarkPipeline:
             'detailed_metrics': metrics
         }
         
+        # Add JSON metrics only if they exist
         if self.test_config.enable_json_tests:
             for model_name in metrics:
-                report['results_summary'][model_name]['avg_json_compliance'] = \
-                    metrics[model_name]['json_metrics']['schema_compliance_rate']
-                    
+                if 'json_metrics' in metrics[model_name]:
+                    report['results_summary'][model_name]['avg_json_compliance'] = \
+                        metrics[model_name]['json_metrics']['schema_compliance_rate']
+                else:
+                    # Include a placeholder or default value if json_metrics is missing
+                    report['results_summary'][model_name]['avg_json_compliance'] = 0.0
+                    logger.warning(f"json_metrics not found for model {model_name}, using default value")
+        
         report_file = f"{results_dir}/metrics_report.json"
         with open(report_file, 'w') as f:
             json.dump(report, f, indent=2)

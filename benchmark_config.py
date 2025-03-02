@@ -15,9 +15,10 @@ class BenchmarkConfig:
         self.GEN_MODEL = MODEL_CONFIG['json_generator']['model_name']
         self.VAL_MODEL = MODEL_CONFIG['validator']['model_name']
         
+        # Use direct references to the models rather than string paths
         self.TEST_MODELS = {
-            'model_A': 'executors.model_A',
-            'model_B': 'executors.model_B'
+            'model_A': 'model_A',
+            'model_B': 'model_B'
         }
         
         # Test execution parameters
@@ -27,4 +28,4 @@ class BenchmarkConfig:
         
         # Rate limiting parameters
         self.RETRY_DELAY = 2  # Base delay in seconds
-        self.MAX_WAIT_TIME = 60  # Maximum wait time in seconds (5 minutes)
+        self.MAX_WAIT_TIME = 60  # Maximum wait time in seconds (1 minute)

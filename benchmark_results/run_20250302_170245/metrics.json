@@ -1,0 +1,30 @@
+{
+  "model_A": {
+    "conversation_metrics": {
+      "bleu_score": 0.1672274497335083,
+      "wer_score": 1.3195072900955254,
+      "response_relevance": 0.18377985318774795,
+      "clarity": 0.9551282051282052,
+      "task_completion": 0.8023809523809523
+    },
+    "json_metrics": {
+      "schema_compliance_rate": 0.0,
+      "field_accuracy": 0.0,
+      "structural_consistency": 0.0
+    }
+  },
+  "model_B": {
+    "conversation_metrics": {
+      "bleu_score": 0.1020705407045097,
+      "wer_score": 1.0613373554550025,
+      "response_relevance": 0.1830148149541644,
+      "clarity": 1.0,
+      "task_completion": 0.8101190476190476
+    },
+    "json_metrics": {
+      "schema_compliance_rate": 1.0,
+      "field_accuracy": 1.0,
+      "structural_consistency": 1.0
+    }
+  }
+}
